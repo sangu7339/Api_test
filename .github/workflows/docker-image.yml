@@ -2,10 +2,12 @@ name: CI/CD Spring Boot Docker EC2
 
 on:
   push:
-    branches: [ "master" ]
+    branches:
+      - master
+      - Test
 
 jobs:
-  build-and-deploy:
+  build-test-deploy:
     runs-on: ubuntu-latest
 
     steps:
@@ -21,26 +23,26 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    # 3️⃣ Build Spring Boot JAR
-    - name: Build with Maven
-      run: mvn clean package -DskipTests
+    # 🏗️ 3️⃣ Build + Test
+    - name: Build & Test with Maven
+      run: mvn clean verify
 
-    # 4️⃣ Login to Docker Hub
+    # 🔐 4️⃣ Docker Hub Login
     - name: Docker Login
       uses: docker/login-action@v3
       with:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
 
-    # 5️⃣ Build Docker Image
+    # 🐳 5️⃣ Build Docker Image
     - name: Build Image
       run: docker build -t seegisangu/myapp:latest .
 
-    # 6️⃣ Push Image to Docker Hub
+    # 📦 6️⃣ Push Image
     - name: Push Image
       run: docker push seegisangu/myapp:latest
 
-    # 7️⃣ Deploy to EC2
+    # 🚀 7️⃣ Deploy to EC2
     - name: Deploy on EC2
       uses: appleboy/ssh-action@v1.0.3
       with:
@@ -48,10 +50,19 @@ jobs:
         username: ${{ secrets.EC2_USER }}
         key: ${{ secrets.EC2_SSH_KEY }}
         script: |
+
+          echo "Branch: ${{ github.ref_name }}"
+
+          # Stop & remove old container
           docker stop myapp-container || true
           docker rm myapp-container || true
+
+          # Pull latest image
           docker pull seegisangu/myapp:latest
+
+          # Run container
           docker run -d -p 8080:8080 \
             --name myapp-container \
             --restart always \
+            --add-host=host.docker.internal:host-gateway \
             seegisangu/myapp:latest
