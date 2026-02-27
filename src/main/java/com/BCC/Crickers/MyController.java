@@ -36,5 +36,10 @@ public class MyController {
 		
 	}
 
+	  @GetMapping("/test")
+    public String test() {
+        return "Spring Boot Test Successful 🚀";
+    }
+
 
 }
